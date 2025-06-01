@@ -48,6 +48,7 @@ class Home(QMainWindow): # Kế thừa các thuộc tính và phương thức t�
         self.btn_exit2.clicked.connect(lambda: self.stackedWidget.setCurrentIndex(0))
         self.btn_setting.clicked.connect(lambda: self.slide_to_page(3))
         self.btn_home.clicked.connect(lambda: self.slide_to_page(0) if self.stackedWidget_2.currentIndex() != 0 else None)
+        self.btn_multi.clicked.connect(lambda: self.slide_to_page(4))
         
         # Các kết nối khác giữ nguyên
         self.btn_account.clicked.connect(self.show_balance)
@@ -63,6 +64,7 @@ class Home(QMainWindow): # Kế thừa các thuộc tính và phương thức t�
         self.gemini_btn.clicked.connect(self.Gemini)
         self.btn_X.clicked.connect(self.open_link_X)
         self.btn_git.clicked.connect(self.open_link_git)
+        
 
         
         # Tự động xác định tài khoản hiện tại
