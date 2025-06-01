@@ -5,7 +5,7 @@ QMainWindow
 }
 
 QPushButton  {
-    background-color: #a08e8e; /* Màu nền nút */
+    background-color:rgb(141, 49, 59); /* Màu nền nút */
     color:rgb(71, 70, 70); /* Màu chữ nút */
     border: 1px solid #555555;
     border-radius: 5px;
