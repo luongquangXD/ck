@@ -61,6 +61,8 @@ class Home(QMainWindow): # Kế thừa các thuộc tính và phương thức t�
         self.btn_change_theme.clicked.connect(lambda: self.apply_theme("code/dark_theme.qss"))
         self.btn_link.clicked.connect(self.open_link)
         self.gemini_btn.clicked.connect(self.Gemini)
+        self.btn_X.clicked.connect(self.open_link_X)
+        self.btn_git.clicked.connect(self.open_link_git)
 
         
         # Tự động xác định tài khoản hiện tại
@@ -69,7 +71,7 @@ class Home(QMainWindow): # Kế thừa các thuộc tính và phương thức t�
         # Thêm hiệu ứng phát sáng cho các nút
         for btn_name in [
             'btn_account','btn_inf','btn_balance','btn_exit2','edit_balance','done_edit',
-            'btn_exit','btn_change_theme','btn_setting','btn_home','btn_link','gemini_btn']:
+            'btn_exit','btn_change_theme','btn_setting','btn_home','btn_link','gemini_btn','btn_X','btn_git']:
             btn = getattr(self, btn_name, None)
             if btn is not None:
                 # Thêm mixin cho từng nút
@@ -161,6 +163,10 @@ class Home(QMainWindow): # Kế thừa các thuộc tính và phương thức t�
         self.apply_theme("code/dark_theme.qss")  # Chuyển sang theme tối
     def open_link(self):
         webbrowser.open('https://www.freeprivacypolicy.com/live/71f463bb-65ad-4e2e-8c53-166ab46cb767')
+    def open_link_X(self):
+        webbrowser.open('https://x.com/quang16062k11')
+    def open_link_git(self):
+        webbrowser.open('https://github.com/luongquangXD')
     def Gemini(self):
         from Chatbotgemini import GeminiChatbot
         self.chatbot_window = GeminiChatbot()
