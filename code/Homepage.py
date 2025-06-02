@@ -1,13 +1,15 @@
 import json
 from PyQt6.QtWidgets import QMessageBox #Lớp QMessageBox để hiển thị thông báo cho người dùng
 from PyQt6.QtWidgets import QMainWindow #Lớp QMainWindow để tạo cửa sổ cho ứng dụng
-from PyQt6.QtWidgets import QWidget,QLineEdit,QApplication
+from PyQt6.QtWidgets import QWidget,QLineEdit,QApplication, QComboBox, QDateEdit
 from PyQt6 import uic
 import webbrowser
 import re
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect
 from PyQt6.QtGui import QColor
-from PyQt6.QtCore import QEvent, QPropertyAnimation, QEasingCurve, QPoint
+from PyQt6.QtCore import QEvent, QPropertyAnimation, QEasingCurve, QPoint, QDate
+import sqlite3
+from datetime import datetime
 
 class GlowButtonMixin:
     def enable_glow(self, color=QColor(0,255,255), blur=20):
@@ -40,6 +42,42 @@ class Home(QMainWindow): # Kế thừa các thuộc tính và phương thức t�
         self.stackedWidget_2.setCurrentIndex(0)
         self.stackedWidget.setCurrentIndex(0)
         
+        # Initialize product types
+        self.product_types = [
+            "Laptop",
+            "Desktop",
+            "Smartphone",
+            "Tablet",
+            "Accessories",
+            "Monitor",
+            "Printer",
+            "Network Device",
+            "Storage Device",
+            "Other"
+        ]
+        
+        # Setup product type comboboxes
+        self.setup_product_type_comboboxes()
+        
+        # Setup date pickers
+        self.setup_date_pickers()
+        
+        # Initialize database
+        self.init_database()
+        
+        # Connect CRUD buttons with debug prints
+        print("Connecting CRUD buttons...")
+        self.pushButton.clicked.connect(lambda: print("ADD button clicked"))
+        self.pushButton.clicked.connect(self.show_add_page)
+        self.pushButton_2.clicked.connect(self.delete_product)
+        self.pushButton_3.clicked.connect(self.show_edit_page)
+        self.pushButton_4.clicked.connect(self.save_new_product)
+        self.pushButton_5.clicked.connect(self.save_edit_product)
+        print("CRUD buttons connected")
+        
+        # Load initial products
+        self.load_products()
+        
         # Kết nối các nút với hiệu ứng chuyển tab
         self.btn_account.clicked.connect(lambda: self.slide_to_page(1))
         self.btn_inf.clicked.connect(lambda: self.slide_to_page(2))
@@ -64,8 +102,6 @@ class Home(QMainWindow): # Kế thừa các thuộc tính và phương thức t�
         self.gemini_btn.clicked.connect(self.Gemini)
         self.btn_X.clicked.connect(self.open_link_X)
         self.btn_git.clicked.connect(self.open_link_git)
-        
-
         
         # Tự động xác định tài khoản hiện tại
         self.set_current_account()
@@ -218,6 +254,285 @@ class Home(QMainWindow): # Kế thừa các thuộc tính và phương thức t�
         # Bắt đầu animation
         self.animation_out.start()
         self.fade_out.start()
+
+    def init_database(self):
+        """Initialize the database and create table if not exists"""
+        conn = sqlite3.connect("techshop.db")
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_code TEXT UNIQUE,
+                product_type TEXT,
+                product_name TEXT,
+                manufacturer TEXT,
+                production_date TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+
+    def load_products(self):
+        """Load all products into the list widget"""
+        self.listWidget.clear()
+        conn = sqlite3.connect("techshop.db")
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM products')
+        products = cursor.fetchall()
+        conn.close()
+
+        for product in products:
+            self.listWidget.addItem(
+                f"Code: {product[1]} | Type: {product[2]} | Name: {product[3]} | "
+                f"Manufacturer: {product[4]} | Date: {product[5]}"
+            )
+
+    def show_edit_page(self):
+        """Switch to edit product page"""
+        try:
+            current_item = self.listWidget.currentItem()
+            if not current_item:
+                QMessageBox.warning(self, "Warning", "Please select a product to edit!")
+                return
+
+            self.slide_to_page(6)  # Changed from 5 to 6 for EDIT page
+            product_code = current_item.text().split("|")[0].split(":")[1].strip()
+            
+            # Load product data into edit fields
+            conn = sqlite3.connect("techshop.db")
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM products WHERE product_code = ?', (product_code,))
+            product = cursor.fetchone()
+            conn.close()
+
+            if product:
+                self.comboBox_product_type_edit.setCurrentText(product[2])
+                self.lineEdit_6.setText(product[3])
+                self.lineEdit_8.setText(product[4])
+                # Convert string date to QDate
+                date = QDate.fromString(product[5], "yyyy-MM-dd")
+                self.dateEdit_production_edit.setDate(date)
+                
+            print(f"Switching to EDIT page. Current index: {self.stackedWidget_2.currentIndex()}")
+        except Exception as e:
+            print(f"Error in show_edit_page: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to switch to EDIT page: {e}")
+
+    def save_edit_product(self):
+        """Save edited product to database"""
+        try:
+            current_item = self.listWidget.currentItem()
+            if not current_item:
+                QMessageBox.warning(self, "Warning", "Vui lòng chọn sản phẩm cần sửa!")
+                return
+
+            product_code = current_item.text().split("|")[0].split(":")[1].strip()
+            product_type = self.comboBox_product_type_edit.currentText()
+            product_name = self.lineEdit_6.text().strip()
+            manufacturer = self.lineEdit_8.text().strip()
+            production_date = self.dateEdit_production_edit.date().toString("yyyy-MM-dd")
+
+            # Validate all fields
+            if not product_name:
+                QMessageBox.warning(self, "Warning", "Vui lòng nhập tên sản phẩm!")
+                self.lineEdit_6.setFocus()
+                return
+            if not manufacturer:
+                QMessageBox.warning(self, "Warning", "Vui lòng nhập nhà sản xuất!")
+                self.lineEdit_8.setFocus()
+                return
+
+            conn = sqlite3.connect("techshop.db")
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE products 
+                SET product_type = ?, product_name = ?, manufacturer = ?, production_date = ?
+                WHERE product_code = ?
+            ''', (product_type, product_name, manufacturer, production_date, product_code))
+            conn.commit()
+            QMessageBox.information(self, "Success", "Cập nhật sản phẩm thành công!")
+            self.load_products()
+            self.slide_to_page(4)  # Switch back to CRUD page
+        except Exception as e:
+            print(f"Error in save_edit_product: {e}")
+            QMessageBox.warning(self, "Error", f"Lỗi khi cập nhật sản phẩm: {e}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
+    def delete_product(self):
+        """Delete selected product from database"""
+        current_item = self.listWidget.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "Warning", "Please select a product to delete!")
+            return
+
+        reply = QMessageBox.question(
+            self, "Confirm Delete",
+            "Are you sure you want to delete this product?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            product_code = current_item.text().split("|")[0].split(":")[1].strip()
+            try:
+                conn = sqlite3.connect("techshop.db")
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM products WHERE product_code = ?', (product_code,))
+                conn.commit()
+                QMessageBox.information(self, "Success", "Product deleted successfully!")
+                self.load_products()
+            except:
+                QMessageBox.warning(self, "Error", "Failed to delete product!")
+            finally:
+                conn.close()
+
+    def setup_product_type_comboboxes(self):
+        """Setup product type comboboxes for both add and edit pages"""
+        # Add page
+        self.comboBox_product_type = QComboBox(self)
+        self.comboBox_product_type.addItems(self.product_types)
+        self.comboBox_product_type.setStyleSheet("""
+            QComboBox {
+                background-color: white;
+                border-radius: 15px;
+                border: 1px solid #555555;
+                padding: 5px;
+            }
+            QComboBox:hover {
+                background-color: #ebdfc0;
+                border-radius: 15px;
+            }
+        """)
+        # Replace lineEdit with combobox in the layout
+        if hasattr(self, 'lineEdit'):
+            self.verticalLayout_17.replaceWidget(self.lineEdit, self.comboBox_product_type)
+            self.lineEdit.hide()  # Hide instead of delete
+        
+        # Edit page
+        self.comboBox_product_type_edit = QComboBox(self)
+        self.comboBox_product_type_edit.addItems(self.product_types)
+        self.comboBox_product_type_edit.setStyleSheet("""
+            QComboBox {
+                background-color: white;
+                border-radius: 15px;
+                border: 1px solid #555555;
+                padding: 5px;
+            }
+            QComboBox:hover {
+                background-color: #ebdfc0;
+                border-radius: 15px;
+            }
+        """)
+        # Replace lineEdit_5 with combobox in the layout
+        if hasattr(self, 'lineEdit_5'):
+            self.verticalLayout_21.replaceWidget(self.lineEdit_5, self.comboBox_product_type_edit)
+            self.lineEdit_5.hide()  # Hide instead of delete
+
+    def setup_date_pickers(self):
+        """Setup date pickers for both add and edit pages"""
+        # Add page
+        self.dateEdit_production = QDateEdit(self)
+        self.dateEdit_production.setCalendarPopup(True)
+        self.dateEdit_production.setDate(QDate.currentDate())
+        self.dateEdit_production.setStyleSheet("""
+            QDateEdit {
+                background-color: white;
+                border-radius: 15px;
+                border: 1px solid #555555;
+                padding: 5px;
+            }
+            QDateEdit:hover {
+                background-color: #ebdfc0;
+                border-radius: 15px;
+            }
+        """)
+        # Replace lineEdit_4 with dateEdit in the layout
+        if hasattr(self, 'lineEdit_4'):
+            self.verticalLayout_18.replaceWidget(self.lineEdit_4, self.dateEdit_production)
+            self.lineEdit_4.hide()  # Hide instead of delete
+        
+        # Edit page
+        self.dateEdit_production_edit = QDateEdit(self)
+        self.dateEdit_production_edit.setCalendarPopup(True)
+        self.dateEdit_production_edit.setDate(QDate.currentDate())
+        self.dateEdit_production_edit.setStyleSheet("""
+            QDateEdit {
+                background-color: white;
+                border-radius: 15px;
+                border: 1px solid #555555;
+                padding: 5px;
+            }
+            QDateEdit:hover {
+                background-color: #ebdfc0;
+                border-radius: 15px;
+            }
+        """)
+        # Replace lineEdit_7 with dateEdit in the layout
+        if hasattr(self, 'lineEdit_7'):
+            self.verticalLayout_22.replaceWidget(self.lineEdit_7, self.dateEdit_production_edit)
+            self.lineEdit_7.hide()  # Hide instead of delete
+
+    def show_add_page(self):
+        """Switch to add product page"""
+        try:
+            # Clear all input fields first
+            self.lineEdit_2.clear()
+            self.lineEdit_3.clear()
+            
+            # Reset combobox and date picker
+            self.comboBox_product_type.setCurrentIndex(0)
+            self.dateEdit_production.setDate(QDate.currentDate())
+            
+            # Switch to ADD page
+            self.slide_to_page(5)  # Changed from 4 to 5 for ADD page
+            
+            # Debug message
+            print(f"Switching to ADD page. Current index: {self.stackedWidget_2.currentIndex()}")
+        except Exception as e:
+            print(f"Error in show_add_page: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to switch to ADD page: {e}")
+
+    def save_new_product(self):
+        """Save a new product to database"""
+        try:
+            # Get values from input fields
+            product_type = self.comboBox_product_type.currentText()
+            product_name = self.lineEdit_2.text().strip()
+            manufacturer = self.lineEdit_3.text().strip()
+            production_date = self.dateEdit_production.date().toString("yyyy-MM-dd")
+
+            # Generate product code
+            product_code = f"SP{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+            # Validate all fields
+            if not product_name:
+                QMessageBox.warning(self, "Warning", "Vui lòng nhập tên sản phẩm!")
+                self.lineEdit_2.setFocus()
+                return
+            if not manufacturer:
+                QMessageBox.warning(self, "Warning", "Vui lòng nhập nhà sản xuất!")
+                self.lineEdit_3.setFocus()
+                return
+
+            conn = sqlite3.connect("techshop.db")
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO products (product_code, product_type, product_name, manufacturer, production_date)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (product_code, product_type, product_name, manufacturer, production_date))
+            conn.commit()
+            QMessageBox.information(self, "Success", "Thêm sản phẩm thành công!")
+            self.load_products()
+            self.slide_to_page(4)  # Switch back to CRUD page
+        except sqlite3.IntegrityError:
+            QMessageBox.warning(self, "Error", "Lỗi khi thêm sản phẩm!")
+        except Exception as e:
+            print(f"Error in save_new_product: {e}")
+            QMessageBox.warning(self, "Error", f"Lỗi khi thêm sản phẩm: {e}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
 
 
            
